@@ -83,7 +83,8 @@ public class ScanFilterAndProjectOperator
             Iterable<ColumnHandle> columns,
             Iterable<Type> types,
             DataSize minOutputPageSize,
-            int minOutputPageRowCount)
+            int minOutputPageRowCount,
+            boolean workProcessorPipelinesEnabled)
     {
         pages = splits.flatTransform(
                 new SplitToPages(
@@ -97,7 +98,8 @@ public class ScanFilterAndProjectOperator
                         types,
                         requireNonNull(memoryTrackingContext, "memoryTrackingContext is null").aggregateSystemMemoryContext(),
                         minOutputPageSize,
-                        minOutputPageRowCount));
+                        minOutputPageRowCount,
+                        workProcessorPipelinesEnabled));
     }
 
     @Override
@@ -180,6 +182,7 @@ public class ScanFilterAndProjectOperator
         final LocalMemoryContext outputMemoryContext;
         final DataSize minOutputPageSize;
         final int minOutputPageRowCount;
+        final boolean workProcessorPipelinesEnabled;
 
         SplitToPages(
                 Session session,
@@ -192,7 +195,8 @@ public class ScanFilterAndProjectOperator
                 Iterable<Type> types,
                 AggregatedMemoryContext aggregatedMemoryContext,
                 DataSize minOutputPageSize,
-                int minOutputPageRowCount)
+                int minOutputPageRowCount,
+                boolean workProcessorPipelinesEnabled)
         {
             this.session = requireNonNull(session, "session is null");
             this.yieldSignal = requireNonNull(yieldSignal, "yieldSignal is null");
@@ -208,6 +212,7 @@ public class ScanFilterAndProjectOperator
             this.outputMemoryContext = localAggregatedMemoryContext.newLocalMemoryContext(ScanFilterAndProjectOperator.class.getSimpleName());
             this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
             this.minOutputPageRowCount = minOutputPageRowCount;
+            this.workProcessorPipelinesEnabled = workProcessorPipelinesEnabled;
         }
 
         @Override
@@ -255,7 +260,8 @@ public class ScanFilterAndProjectOperator
                             session.toConnectorSession(),
                             yieldSignal,
                             outputMemoryContext,
-                            page))
+                            page,
+                            workProcessorPipelinesEnabled))
                     .transformProcessor(processor -> mergePages(types, minOutputPageSize.toBytes(), minOutputPageRowCount, processor, localAggregatedMemoryContext))
                     .withProcessStateMonitor(state -> memoryContext.setBytes(localAggregatedMemoryContext.getBytes()));
         }
@@ -383,6 +389,7 @@ public class ScanFilterAndProjectOperator
         private final List<Type> types;
         private final DataSize minOutputPageSize;
         private final int minOutputPageRowCount;
+        private final boolean workProcessorPipelinesEnabled;
         private boolean closed;
 
         public ScanFilterAndProjectOperatorFactory(
@@ -396,7 +403,8 @@ public class ScanFilterAndProjectOperator
                 Iterable<ColumnHandle> columns,
                 List<Type> types,
                 DataSize minOutputPageSize,
-                int minOutputPageRowCount)
+                int minOutputPageRowCount,
+                boolean workProcessorPipelinesEnabled)
         {
             this.operatorId = operatorId;
             this.planNodeId = requireNonNull(planNodeId, "planNodeId is null");
@@ -409,6 +417,7 @@ public class ScanFilterAndProjectOperator
             this.types = requireNonNull(types, "types is null");
             this.minOutputPageSize = requireNonNull(minOutputPageSize, "minOutputPageSize is null");
             this.minOutputPageRowCount = minOutputPageRowCount;
+            this.workProcessorPipelinesEnabled = workProcessorPipelinesEnabled;
         }
 
         @Override
@@ -462,7 +471,8 @@ public class ScanFilterAndProjectOperator
                     columns,
                     types,
                     minOutputPageSize,
-                    minOutputPageRowCount);
+                    minOutputPageRowCount,
+                    workProcessorPipelinesEnabled);
         }
 
         @Override
